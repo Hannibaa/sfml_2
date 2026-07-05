@@ -1,0 +1,271 @@
+#pragma once
+
+/* 
+			UTILITY FOR SFML GEOMETRICAL OBJECT
+
+*/
+#include <Windows.h>
+#include <filesystem>
+#include <string>
+#include <vector>
+#include <map>
+#include <random>
+#include <numeric>
+
+
+#define KA_PI							3.14159265359f
+
+namespace util {
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//                 Get Number of Processros    
+	//
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
+	int GetNumberOfCores(void)
+	{
+
+#if defined( _WIN64 )
+		SYSTEM_INFO sysinfo;
+		GetSystemInfo(&sysinfo);
+		return sysinfo.dwNumberOfProcessors;
+#elif defined( __APPLE__ )
+		return (int)sysconf(_SC_NPROCESSORS_ONLN);
+#elif defined( __linux__ )
+		return (int)sysconf(_SC_NPROCESSORS_ONLN);
+#elif defined( __EMSCRIPTEN__ )
+		return (int)sysconf(_SC_NPROCESSORS_ONLN);
+#else
+		return 1;
+#endif
+	}
+
+
+	bool is_perfect_division(uint32_t a, uint32_t b) {
+		return a % b == 0u;
+	}
+
+	void get_right_perfect_division(uint32_t a, uint32_t& b) {
+		while (a % b != 0u) {
+			++b;
+		}
+	}
+
+
+	bool inf(float x, float y, float epsilon) {
+		return std::abs(y - x) < epsilon;
+	}
+
+	template<typename T>
+		requires requires(T x) { x > x; }
+	void swap_min_max(T& min, T& max) {
+		if (min > max) std::swap(min, max);
+	}
+
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//                 Get working directory for executable file    
+	//
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
+	inline std::string get_working_dir() {
+
+
+		return {};
+	}
+
+
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//                     Get list of file inside directory 
+	//
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
+	inline std::vector<std::string> get_file_list(
+		const std::string& directory,
+		const std::string& search = "*.*"
+	)
+	{
+
+
+
+		return {};
+	}
+
+
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//                     Interpolation function between two number
+	//
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
+	template<typename T>
+	requires std::is_arithmetic_v<T>
+	inline T interpolate(float tBegin, float tEnd, T begin_val, T end_val, float tX) {
+		return static_cast<T>(
+			(((end_val - begin_val) / (tEnd - tBegin)) * (tX - tBegin)) + begin_val);
+	}
+
+
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//                     Structure that get name of bool and its need
+	//
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
+	template<typename Tchar>
+	struct _XBool {
+		bool						_action;
+		std::basic_string<Tchar>	_comment;
+
+		void not_() {
+			_action = !_action;
+		}
+
+		bool operator()() const {
+			return _action;
+		}
+
+		bool operator()() {
+			return _action;
+		}
+	};
+
+	using XBool = _XBool<char>;
+	using mapBool = std::map<std::string, XBool>;
+
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//                     Random variable and random strings
+	//
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
+	std::string		get_random_string() {
+
+		return {};
+	}
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//              SIMPLE RANDOM NUMBER FUNCTOR GENERATOR.
+	//              1. INTEGER VALUE  iRG.
+	//              2. FLOAT VALUE    fRG.
+	// 
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	template<typename T>
+	T get_random(T min, T max) {
+		swap_min_max(min, max);
+		static_assert(std::is_integral<T>::value, "T type should be integer type");
+		std::random_device rd;
+		std::mt19937 engin(rd());
+		std::uniform_int_distribution<T> rand(min,max);
+
+		return rand(engin);
+	}
+
+	template<typename TF>
+	TF get_random_float(TF min, TF max) {
+		swap_min_max(min, max);
+
+		static_assert(std::is_floating_point<TF>::value, "T type should be floating point type");
+		std::random_device rd;
+		std::mt19937 engin(rd());
+		std::uniform_real_distribution<TF> rand(min, max);
+
+		return rand(engin);
+	}
+
+	template<typename T>
+	T get_random_one_of(std::initializer_list<T> list) {
+		std::vector<T> v(list);
+
+		return v[get_random(0, v.size() - 1)];
+	}
+
+	template<typename T>
+	class iRG {
+		static_assert(std::is_integral<T>::value, "T type should be integer type");
+
+		std::random_device               rd;
+		std::mt19937                     engine;
+		std::uniform_int_distribution<T> iRand;
+
+	public:
+		iRG() : engine(rd()) {}
+
+		T operator () (T min, T max) {
+			if (min > max) std::swap(min, max);
+			iRand = std::uniform_int_distribution<T>(min, max);
+			return iRand(engine);
+		}
+
+	};
+
+
+	template<typename T>
+	class fRG {
+		static_assert(std::is_floating_point<T>::value, "T type should be floating point type");
+		std::random_device rd;
+		std::mt19937 engine;
+		std::uniform_real_distribution<T> fRand;
+
+	public:
+		fRG() : engine(rd()) {}
+
+		T operator () (T min, T max) {
+			if (min > max) std::swap(min, max);
+			fRand = std::uniform_real_distribution<T>(min, max);
+			return fRand(engine);
+		}
+	};
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//                     RANDOM COMPONENTS OF (0,1,2,... N) -> (R1, R2,...,RN)
+	//
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
+	std::vector<int>  make_random_map(int n) {
+		util::iRG<int>			irand;
+
+		std::vector<int>		order(n);
+		std::iota(order.begin(), order.end(), 0);
+
+		std::vector<int>		random;
+		random.reserve(n);
+
+		for (int i = 0; i < n; ++i)
+		{
+			int k = irand(0, n - 1 - i);
+			random.push_back(order[k]);
+			order.erase(order.begin() + k);
+		}
+
+		return random;
+	}
+
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//                     CHECK IF VALUE IS CHANGED FROM OLD TO NEW VALUE
+	//
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
+	template<typename T>
+	class IsValueChanged {
+		T	old_value;
+
+	public:
+		IsValueChanged(const T& value) :old_value(value) {}
+
+		bool operator()(T value) {
+			if (value == old_value) return false;
+			else {
+				old_value = value;
+				return true;
+			}
+		}
+	};
+
+
+
+}
