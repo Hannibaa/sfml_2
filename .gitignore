@@ -361,3 +361,8 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/imgui.ini
+/sfml_2.vcxproj
+/sfml_2.vcxproj.filters
+/resource.h
+/sfml_2.rc

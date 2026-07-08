@@ -43,6 +43,24 @@ namespace util {
             setPosition(pos.x, pos.y);
         }
 
+        std::vector<ivec2> getGridPosition(const fvec2& fmouse) const {
+            if (!_rect.contains(fmouse)) return {};
+
+            std::vector<ivec2>  vec(1);
+            const float     w = _rect.width / (_grid_lines);
+            const float     h = _rect.height / (_grid_colum);
+
+            // calculate number of grids
+            float xm = fmouse.x - _rect.left;
+            float ym = fmouse.y - _rect.top;
+            int nx = (int)xm / w;
+            int ny = (int)ym / h;
+
+            vec[0].x = nx;
+            vec[0].y = ny;
+            return vec;
+        }
+
     private:
         virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const {
 

@@ -4,7 +4,6 @@
 			UTILITY FOR SFML GEOMETRICAL OBJECT
 
 */
-#include <Windows.h>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -15,6 +14,17 @@
 
 #define KA_PI							3.14159265359f
 
+using u64 = uint64_t;
+using u32 = uint32_t;
+using u16 = uint16_t;
+using u8 = uint8_t;
+using f64 = double;
+using f32 = float;
+using i64 = int64_t;
+using i32 = int32_t;
+using i16 = int16_t;
+using i8 = int8_t;
+
 namespace util {
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,7 +32,7 @@ namespace util {
 	//                 Get Number of Processros    
 	//
 	/////////////////////////////////////////////////////////////////////////////////////////////////////
-	int GetNumberOfCores(void)
+	/*int GetNumberOfCores(void)
 	{
 
 #if defined( _WIN64 )
@@ -38,6 +48,12 @@ namespace util {
 #else
 		return 1;
 #endif
+	}
+	*/
+
+	template<typename T>
+	void clamp(T& x, const T& min, const T& max) {
+		x = std::clamp(x, min, max);
 	}
 
 
@@ -134,6 +150,22 @@ namespace util {
 	using XBool = _XBool<char>;
 	using mapBool = std::map<std::string, XBool>;
 
+	template<typename T>
+	struct _XValue {
+		T							_value;
+		std::string					_comment;
+
+		T operator()() const {
+			return _value;
+		}
+
+		T& operator()() {
+			return _value;
+		}
+	};
+
+	template<typename T>
+	using mapValue = std::map<std::string, _XValue<T>>;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////
 	//

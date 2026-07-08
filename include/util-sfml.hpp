@@ -16,6 +16,15 @@ using VSprites = std::vector<sf::Sprite>;
 
 namespace util {
 
+	/// CONVERT COORDINAT TYPE
+	template<typename T, typename U>
+	sf::Vector2<T> as(const sf::Vector2<U>& v) {
+		sf::Vector2<T> w;
+		w.x = static_cast<T>(v.x);
+		w.y = static_cast<T>(v.y);
+		return w;
+	}
+
 	struct Quadra {
 
 	private:
@@ -45,6 +54,11 @@ namespace util {
 				return a[index];
 		}
 	};
+
+
+	bool inf2d(const fvec2& v, const fvec2& w, float epsilon) {
+		return inf(v.x, w.x, epsilon) && inf(v.y, w.y, epsilon);
+	}
 
 
 	bool is_vector_close(const sf::Vector2f& a, const sf::Vector2f& b, float epsilon)
