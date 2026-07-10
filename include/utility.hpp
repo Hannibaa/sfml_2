@@ -142,7 +142,7 @@ namespace util {
 			return _action;
 		}
 
-		bool operator()() {
+		bool& operator()() {
 			return _action;
 		}
 	};
