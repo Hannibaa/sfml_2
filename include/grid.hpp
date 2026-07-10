@@ -30,6 +30,13 @@ namespace util {
             , _color{ sf::Color::White }
         {}
 
+        Grid(const sf::FloatRect& rect, float unit_length)
+            :_rect(rect),
+            _grid_lines(rect.width / unit_length),
+            _grid_colum(rect.height / unit_length),
+            _color(sf::Color::White)
+        { }
+
         void set_color(const sf::Color& color) {
             _color = color;
         }
@@ -41,6 +48,10 @@ namespace util {
 
         void setPosition(const fvec2& pos) {
             setPosition(pos.x, pos.y);
+        }
+
+        fvec2 getPosition() const {
+            return fvec2(_rect.left, _rect.top);
         }
 
         std::vector<ivec2> getGridPosition(const fvec2& fmouse) const {
