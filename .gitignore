@@ -366,3 +366,6 @@ FodyWeavers.xsd
 /sfml_2.vcxproj.filters
 /resource.h
 /sfml_2.rc
+/sfml_2.vcxproj
+/sfml_2.vcxproj.filters
+/imgui.ini
