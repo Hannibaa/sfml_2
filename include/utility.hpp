@@ -27,6 +27,28 @@ using i8 = int8_t;
 
 namespace util {
 
+	template<typename T>
+	struct Coordinate_t {
+		T	x;
+		T	y;
+	};
+
+
+	int Bit(int x, int number_bit) {
+		return (x >> number_bit) & 1;
+	}
+
+
+	template<typename T>
+	void reset(std::vector<T>& vec, const T& value) {
+		for (auto& e : vec) e = value;
+	}
+
+	template<typename T>
+	void clear(std::stack<T>& stack) {
+		while (!stack.empty()) stack.pop();
+	}
+
 	//////////////////////////////////////////////////////////////////////////////////////////////////////
 	//
 	//                 Get Number of Processros    
@@ -56,6 +78,12 @@ namespace util {
 		x = std::clamp(x, min, max);
 	}
 
+	template<typename T>
+	requires std::is_integral_v<T>
+	void priodic_clamp(T& x, const T& min, const T& max) {
+		x = x < min ? max : x > max ? min : x;
+	}
+
 
 	bool is_perfect_division(uint32_t a, uint32_t b) {
 		return a % b == 0u;
@@ -77,6 +105,72 @@ namespace util {
 	void swap_min_max(T& min, T& max) {
 		if (min > max) std::swap(min, max);
 	}
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// 
+	//				Maximum and Minimum  of Updated value inside Main Loop 
+	// 
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////
+	template<typename T>
+		requires std::is_arithmetic_v<T>
+	void get_maximum(T& max, const T& var) {
+		max = var > max ? var : max;
+	}
+
+	template<typename T>
+		requires std::is_arithmetic_v<T>
+	void get_minimum(T& min, const T& var) {
+		min = var < min ? var : min;
+	}
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// 
+	//    Date and Current Time system
+	// 
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	////////////////////////////////////////// Extract Date and Time System //////////////////////
+	std::string make_daytime_string_s() {
+		time_t now = time(nullptr);
+		char buf[256];
+		ctime_s(buf, 256, &now);
+		return buf;
+	}
+
+	std::string make_current_date() {
+		auto stime = make_daytime_string_s();
+		return stime.substr(0, 10) + stime.substr(19);
+	}
+
+	std::string make_current_time() {
+		auto stime = make_daytime_string_s();
+		return stime.substr(11, 8);
+	}
+
+	/// Update a Function every period of time
+	template<typename CLOCK, typename FUNCTION>
+	void update_every( CLOCK& clock,  float delta, FUNCTION function) {
+
+		if (clock.getElapsedTime().asSeconds() > delta) {
+			function();
+			clock.restart();
+		}
+	}
+
+	// Waiting for period of time
+	template<typename CLOCK>
+	void waiting(float delta) {
+
+		CLOCK clock;
+		while (clock.getElapsedTime().asSeconds() < delta) {
+
+		}
+
+		clock.restart();
+
+	}
+
+
 
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -300,4 +394,10 @@ namespace util {
 
 
 
-}
+}// Namespace util
+
+template<typename T>
+using Coord = util::Coordinate_t<T>;
+
+using iCoord = Coord<int>;
+using fCoord = Coord<float>;
