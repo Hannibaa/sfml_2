@@ -5,6 +5,7 @@
 
 */
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <map>
@@ -27,6 +28,65 @@ using i8 = int8_t;
 
 namespace util {
 
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//                 String Utility    
+	//
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
+	auto get_first_number(const std::string& str) {
+		std::string number;
+		bool b = false;
+		int i = 0;
+		for (auto it = str.begin(); it != str.end(); ) {
+			if (std::isdigit(*it)) { number.push_back(*it); b = true; }
+			++it; ++i;
+			//if (it == str.end()) break;
+			if (it == str.end() || (b && !std::isdigit(*it))) {
+				b = false;
+				break;
+			}
+		}
+
+		return std::pair(number, i);
+	}
+
+	auto get_all_number(std::string str) {
+		std::vector<std::string>		vstr;
+
+		while (true) {
+			auto pair = get_first_number(str);
+			vstr.push_back(pair.first);
+			if (pair.second == str.size()) break;
+			str = str.substr(pair.second);
+		}
+
+		return vstr;
+	}
+
+	// Use function when you are 100% now about argument is number int or float point
+	int strtoint(const std::string& number) {
+		int i = 0;
+		for (char c : number) {
+			// Checking if the element is digit
+			if (c >= '0' && c <= '9') {
+				i = i * 10 + (c - '0');
+			}
+			else
+			{
+				// bad out put 0
+				return 0;
+			}
+		}
+
+		return i;
+	}
+
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//                 Structure  
+	//
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
 	template<typename T>
 	struct Coordinate_t {
 		T	x;
@@ -43,6 +103,55 @@ namespace util {
 	void reset(std::vector<T>& vec, const T& value) {
 		for (auto& e : vec) e = value;
 	}
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//                 Get Number of Processros    
+	//
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+	bool save_vector_to(const std::vector<int>& maze, const std::string& filename) {
+
+		std::ofstream	file(filename, std::ios::binary);
+
+		if (!file) {
+			std::cerr << "Error: Cannot open file for writing : " << filename << '\n';
+			return false;
+		}
+
+		// 1. write the size of vector
+		size_t size = maze.size();
+		file.write(reinterpret_cast<const char*>(&size), sizeof(size));
+
+		// 2. write maze data
+		file.write(reinterpret_cast<const char*>(maze.data()), size * sizeof(int));
+
+		return file.good();
+	}
+
+	bool load_vector_from(std::vector<int>& maze, const std::string& filename) {
+		std::ifstream		file(filename, std::ios::binary);
+
+		if (!file) {
+			std::cerr << "Error : Cannot open file for reading : " << filename << '\n';
+			return false;
+		}
+
+		// 1. read size
+		size_t size;
+		file.read(reinterpret_cast<char*>(&size), sizeof(size));
+
+		// 2. read data to vector
+		maze.clear();
+		maze.resize(size);
+
+		file.read(reinterpret_cast<char*>(maze.data()), size * sizeof(int));
+
+		return file.good();
+	}
+
+
 
 	template<typename T>
 	void clear(std::stack<T>& stack) {
@@ -134,7 +243,7 @@ namespace util {
 		time_t now = time(nullptr);
 		char buf[256];
 		ctime_s(buf, 256, &now);
-		return buf;
+		return std::string(buf);
 	}
 
 	std::string make_current_date() {
@@ -145,6 +254,17 @@ namespace util {
 	std::string make_current_time() {
 		auto stime = make_daytime_string_s();
 		return stime.substr(11, 8);
+	}
+
+	std::string make_serial_daytime() {
+		// get string like this 07142026123056 
+		std::string daytime = make_daytime_string_s();
+		std::string serial;
+		for (auto& c : daytime) {
+			if (std::isdigit(c)) serial.push_back(c);
+		}
+
+		return serial;
 	}
 
 	/// Update a Function every period of time
