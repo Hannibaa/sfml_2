@@ -22,6 +22,12 @@ namespace util {
         sf::Color       _color;
 
     public:
+        Grid(int nlx, int nly, float ulength)
+            :_rect(0.f, 0.f, nlx * ulength, nly * ulength)
+            ,_grid_lines(nlx)
+            ,_grid_colum(nly)
+            ,_color(sf::Color::White)
+        { }
 
         Grid(const sf::FloatRect& rect, int lines, int column)
             :_rect(rect)
@@ -36,6 +42,11 @@ namespace util {
             _grid_colum(rect.height / unit_length),
             _color(sf::Color::White)
         { }
+
+        bool contains(const ivec2& ip) {
+            return ip.x >= 0 && ip.x < _grid_lines &&
+                ip.y >= 0 && ip.y < _grid_colum;
+        }
 
         void set_color(const sf::Color& color) {
             _color = color;
