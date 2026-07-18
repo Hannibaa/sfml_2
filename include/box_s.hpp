@@ -53,11 +53,21 @@ namespace util {
 
 			if (number_side >= 0 && number_side < 8)
 			{
-				if (_dont_draw.contains(number_side))
-					_dont_draw.erase(number_side);
-				else
-					_dont_draw.insert(number_side);
+				_dont_draw.erase(number_side);
 			}
+		}
+
+		void unset_wall(int number_side) {
+			if (number_side == WALL::CLEAR) {
+				for (int i = 0; i < 8; ++i)
+					_dont_draw.insert(i);
+			}
+
+			if (number_side >= 0 && number_side < 8)
+			{
+				_dont_draw.insert(number_side);
+			}
+
 		}
 
 		fvec2 getPosition() const {
