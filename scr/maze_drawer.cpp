@@ -59,43 +59,41 @@
 
 					  to retrive wall from cell(x,y) using function
 					  WALL(cell(x,y)) = 0b1101
-
-			FILE FORMAT
-			"maze_" + datetimeserialnumber + ".maze" + Nx + "x" + Ny 
-
 */
-
 
 #include "imgui.h"
 #include "imgui-SFML.h"
 
 #include <iostream>
 #include <stack>
-#include <functional>
+#include <filesystem>
+#include <fstream>
+
 #include <SFML/Graphics.hpp>
 #include "../include/util-sfml.hpp"
 #include "../include/box_s.hpp"
+#include "../opendialogfile.h"
 
 #define VISITOR(x)		(x & 0b1)
-#define WALL1(x)		((x >> 1) & 1b)
-#define WALL2(x)		((x >> 2) & 1b)
-#define WALL3(x)		((x >> 3) & 1b)
-#define WALL4(x)		((x >> 4) & 1b)
-#define WALL(x,n)		((x >> n) & 1b)
+#define WALL1(x)		((x >> 1) & 0b1)
+#define WALL2(x)		((x >> 2) & 0b1)
+#define WALL3(x)		((x >> 3) & 0b1)
+#define WALL4(x)		((x >> 4) & 0b1)
+#define WALL(x,n)		((x >> n) & 0b1)
 #define SETVISITOR(x)   
 
 #define SETWALLS(x)     
 
 using Grid_t = std::vector<util::Box_s>;
 
-static void make_grid(
+void make_grid(
 	Grid_t& grid,
 	const fvec2& pos,
 	color_t wall_color,
 	f32	ulength,
 	f32 wall_thickness,
-	u32	nx,
-	u32 ny
+	i32	nx,
+	i32 ny
 )
 {
 	for (u32 i = 0; i < nx; ++i)
@@ -105,128 +103,80 @@ static void make_grid(
 		}
 }
 
+void draw_maze(
+	Grid_t& grid, 
+	const std::vector<int>& maze, 
+	const fvec2& pos,
+	color_t wall_color,
+	f32 ulength,
+	f32 wall_thickness,
+	int Nx, 
+	int Ny) 
+{
+	grid.clear();
+	make_grid(grid, pos, wall_color ,ulength,  wall_thickness , Nx, Ny);
 
-static void reset_grid_color(Grid_t& grid) {
+	for (int i = 0; i < Nx; ++i)
+		for (int j = 0; j < Ny; ++j)
+		{
+			int NZ = j + Ny * i;
+			if (WALL1(maze[NZ])) grid[NZ].unset_wall(1);
+			if (WALL2(maze[NZ])) grid[NZ].unset_wall(3);
+			if (WALL3(maze[NZ])) grid[NZ].unset_wall(5);
+			if (WALL4(maze[NZ])) grid[NZ].unset_wall(7);
+		}
+}
+
+
+void reset_grid_color(Grid_t& grid) {
 	for (auto& b : grid) {
 		b.setFillColor(sf::Color::Transparent);
 		b.set_wall(util::Box_s::WALL::CLEAR);
 	}
 }
 
-void walk_function_1(int nx, int ny) {
-	util::iRG<int>		irand;
-	int walk = irand(0, 3);
 
-	switch (walk) {
-	case 0:++nx; break;
-	case 1:--nx; break;
-	case 2:++ny; break;
-	case 3:--ny; break;
+bool save_maze(const std::vector<int>& maze, const std::string& filename) {
+	
+	std::ofstream	file(filename, std::ios::binary );
+
+	if (!file) {
+		std::cerr << "Error: Cannot open file for writing : " << filename << '\n';
+		return false;
 	}
+
+	// 1. write the size of vector
+	size_t size = maze.size();
+	file.write(reinterpret_cast<const char*>(&size), sizeof(size));
+
+	// 2. write maze data
+	file.write(reinterpret_cast<const char*>(maze.data()), size * sizeof(int));
+
+	return file.good();
 }
 
-class walk_behavior {
-	int&  _dir;
+bool load_maze(std::vector<int>& maze, const std::string& filename) {
+	std::ifstream		file(filename, std::ios::binary);
 
-public:
-	walk_behavior(int& dir) : _dir(dir) {};
-
-	void operator()(int nx, int ny) {
-		switch (_dir) {
-		case 0:++nx; break;
-		case 1:--nx; break;
-		case 2:++ny; break;
-		case 3:--ny; break;
-		}
+	if (!file) {
+		std::cerr << "Error : Cannot open file for reading : " << filename << '\n';
+		return false;
 	}
-};
 
-static void run(int nx, int ny, int Nx, int Ny,
-	int(*visited_neibor)(int,int), 
-	std::stack<iCoord>& prev,
-	std::function<void(int,int)> walk_function,
-	bool& b_validate,
-	bool& b_runing) 
-{
-	if (b_runing) {
-		// random function
-		util::iRG<int>		irand;
-		// calculate visit neibors
-		int visitedNeibor = visited_neibor(nx, ny);
+	// 1. read size
+	size_t size;
+	file.read(reinterpret_cast<char*>(&size), sizeof(size));
 
-		// checking 
-		if (visitedNeibor == 4) {
-			prev.pop();
-			if (!prev.empty()) {
-				nx = prev.top().x;
-				ny = prev.top().y;
-			}
-			else {
-				prev.push({ 0,0 });
-			}
-			b_validate = true;
-		}
-		else {
-			int walk = irand(0, 3);
+	// 2. read data to vector
+	maze.clear();
+	maze.resize(size);
 
-			switch (walk) {
-			case 0:++nx; break;
-			case 1:--nx; break;
-			case 2:++ny; break;
-			case 3:--ny; break;
-			}
+	file.read(reinterpret_cast<char*>(maze.data()), size * sizeof(int));
 
-			b_validate = true;
-
-			util::clamp(nx, 0, Nx - 1);
-			util::clamp(ny, 0, Ny - 1);
-		}
-	}
+	return file.good();
 }
 
-void move(Grid_t& grid, 
-		std::vector<int>& maze,
-		std::stack<iCoord>& prev,
-	void (*remove_adjacent_wall)(int,int , int, int),
-	int nx, int ny, int Nx, int Ny,
-	int& nVisited, 
-	bool& b_validate, 
-	bool& b_runing
-	) 
-{
-	if (b_validate) {
-		if (nVisited < Nx * Ny) {
-			// Create a matrix of visited cells
-			if ((maze[ny + Ny * nx] & 0b1) == 0) {
-				maze[ny + Ny * nx] |= 1;
-				// memorized top previous visited cell to checked after
-				int oldx = prev.top().x;
-				int oldy = prev.top().y;
 
-				// push new visited cell
-				prev.push({ nx,ny });
-				++nVisited;
-
-				//  remove wall between adjacent cells
-				remove_adjacent_wall(nx, ny, oldx, oldy);
-			}
-			else {
-				nx = prev.top().x;
-				ny = prev.top().y;
-			}
-
-			// paint visited cell
-			if ((maze[ny + Ny * nx] & 0b1) == 1) {
-				grid[ny + Ny * nx].setFillColor(color_t::Black);
-			}
-		}
-		else
-			b_runing = false;
-
-		b_validate = false;
-	}
-
-}
 
 int main() {
 
@@ -245,13 +195,9 @@ int main() {
 	color_t				black = color_t::Black;
 	int								Nx{ 15 }, Ny{ 20 };
 
-	std::cout << "Enter number of column(2 - "<< MAX_X << ") : ";
-	std::cin >> Nx;
-	std::cout << "Enter number of lines(2 - " << MAX_Y << ") : ";
-	std::cin >> Ny;
 
-	util::clamp(Nx, 2, MAX_X);
-	util::clamp(Ny, 2, MAX_Y);
+	util::clamp(Nx, 5, MAX_X);
+	util::clamp(Ny, 10, MAX_Y);
 
 	util::iRG<int>		irand;
 
@@ -262,10 +208,9 @@ int main() {
 	// Bool action
 	util::mapBool		Bool;
 	Bool["ShowOption"] = { true, "Show option menu" };
-	Bool["Run"] = { false, "Run the strategy" };
 	Bool["Skip"] = { true, "skip the loop" };
-	Bool["Back"] = { false,"Backspace or to get possible case" };
-	Bool["ShowBox"] = { true, "Show a box index" };
+	Bool["ShowBox"] = { false, "Show a box index" };
+	Bool["DrawMaze"] = { false, "Drawing a loaded maze" };
 
 	// box that make maze
 	Box_t							box;
@@ -274,11 +219,7 @@ int main() {
 	// maze stat cell
 	std::vector<int>				maze;
 	// stack of path visited cell
-	std::stack<iCoord>				prev;
-	int prevx{}, prevy{};
-
-	int								nVisited{ 1 };
-	color_t							color(sf::Color::White);
+	color_t							wall_color(sf::Color::White);
 	int								nx{}, ny{};
 	int								oldnx{}, oldny{};
 
@@ -292,12 +233,9 @@ int main() {
 	box.setFillColor(red);
 
 
-	make_grid(grid, gridPos, color, ulength, thickness, Nx, Ny);
-	const int WALLS_UNVISITED = 30;
-	const int WALLS_VISITED = 31;
-	maze.resize(Nx * Ny,WALLS_UNVISITED);
-	maze[0] = WALLS_VISITED;
-	prev.push({ 0,0 });
+	//make_grid(grid, gridPos, wall_color, ulength, thickness, Nx, Ny);
+	const int WALLS_UNVISITED = 0;
+	const int WALLS_VISITED = 1;
 
 	// check boundary of coordinate grid
 	auto in_bound = [=](int x, int y) {
@@ -379,18 +317,15 @@ int main() {
 		util::reset(maze, WALLS_UNVISITED);
 		maze[0] = WALLS_VISITED;
 		reset_grid_color(grid);
-		util::clear(prev);
-		prev.push({ 0,0 });
-		nVisited = 0;
 		nx = 0;
 		ny = 0;
 		oldnx = 0;
 		oldny = 0;
 		Bool["Skip"]() = true;
+
 		};
 
-	fvec2				fmouse{};
-	ivec2				imouse{};
+
 	sf::Clock			iclock;
 	sf::Clock			fpsClock;
 	sf::Clock			updateClock;
@@ -405,7 +340,7 @@ int main() {
 	float				elapsed_time = 1.f;
 
 
-	// MAIN LOOP ///////////////////////////////////////////////////
+	// MAIN LOOP
 	while (window.isOpen()) {
 		util::get_maximum(max_fps, fps);
 		util::get_minimum(min_fps, fps);
@@ -425,16 +360,13 @@ int main() {
 			ImGui::SFML::ProcessEvent(event);
 			if (event.type == sf::Event::Closed) window.close();
 
-			imouse = sf::Mouse::getPosition(window);
-			fmouse = util::as<float>(imouse);
-
 			if (event.type == sf::Event::KeyPressed) {
 
 				if (event.key.code == sf::Keyboard::A && event.key.control) {
 					Bool["ShowOption"].not_();
 				}
 
-				
+
 			}
 
 			if (event.type = sf::Event::MouseButtonPressed)
@@ -446,84 +378,9 @@ int main() {
 
 		} // Event Loop
 
+
+
 		ImGui::SFML::Update(window, iclock.restart());
-
-
-		// Random runnig of maze
-		if (Bool["Run"]()) {
-			// calculate visit neibors
-			visitedNeibor = visited_neibor(nx, ny);
-
-			// checking 
-			if (visitedNeibor == 4) {
-				prev.pop();
-				if (!prev.empty()) {
-					nx = prev.top().x;
-					ny = prev.top().y;
-				}
-				else {
-					prev.push({ 0,0 });
-				}
-				Bool["Skip"]() = true;
-			}
-			else {
-				int walk = irand(0, 3);
-
-				switch (walk) {
-				case 0:++nx; break;
-				case 1:--nx; break;
-				case 2:++ny; break;
-				case 3:--ny; break;
-				}
-
-				Bool["Skip"]() = true;
-
-				util::clamp(nx, 0, Nx - 1);
-				util::clamp(ny, 0, Ny - 1);
-			}
-		}
-
-		// Check if box is visited only when you performed a movement 
-		// Memorization, Verification and Creation of Path
-		if (Bool["Skip"]()) {
-			if (nVisited < Nx * Ny) {
-				// Create a matrix of visited cells
-				if ((maze[ny + Ny * nx] & 0b1) == 0) {
-					maze[ny + Ny * nx] |= 1;
-					// memorized top previous visited cell to checked after
-					int oldx = prev.top().x;
-					int oldy = prev.top().y;
-
-					// push new visited cell
-					prev.push({ nx,ny });
-					++nVisited;
-
-					//  remove wall between adjacent cells
-					remove_adjacent_wall(nx, ny, oldx, oldy);
-				}
-				else {
-					nx = prev.top().x;
-					ny = prev.top().y;
-				}
-
-				// paint visited cell
-				if ((maze[ny + Ny * nx] & 0b1) == 1) {
-					grid[ny + Ny * nx].setFillColor(black);
-				}
-			}
-			else
-				Bool["Run"]() = false;
-
-			Bool["Skip"]() = false;
-		}
-
-
-
-		// ALL IMGUI Menu here Begin
-		if (!prev.empty()) {
-			prevx = prev.top().x;
-			prevy = prev.top().y;
-		}
 
 		ImGui::Begin("Option", &Bool["ShowOption"]());
 		if (ImGui::Button("Close")) window.close();
@@ -531,44 +388,60 @@ int main() {
 		ImGui::Text("FPS[ %.2f ] ", fps5sec);
 		//ImGui::Text("Grid Number[%d][%d]", gnum.x, gnum.y);
 		ImGui::Text("Max[%.2f]   Min[%.2f]", max_fps, min_fps);
-		ImGui::Text("Visited %d", nVisited);
-		ImGui::Text("[%d][%d] stat[%d]", nx, ny, maze[ny + Ny * nx]);
-		ImGui::Text("[%d]stack[%d][%d] stat[%d]", prev.size(), prevx, prevy, maze[prevy + Ny * prevx]);
 		ImGui::Text("Visited Neibors [%d]", visitedNeibor);
-		if (ImGui::Button("RESETMAZE")) {
+		if (ImGui::Button("RESET MAZE")) {
 			reset_maze();
 		}
 
-		if (ImGui::Button("Save")) {
-			std::string filename = "maze_" + util::make_serial_daytime()
-				+ ".maze" + std::to_string(Nx) + "x" + std::to_string(Ny);
-			util::save_vector_to(maze, filename);
+		bool isloaded = false;
+
+		if (ImGui::Button("Load")) {
+			Bool["Run"]() = false;
+			std::string maze_filename;
+			
+			// open file dialogue box
+			auto file = opendialog::OpenFile(L"Maze file .maze");
+			maze_filename = std::string(file.begin(), file.end());
+			auto all_number = util::get_all_number(maze_filename);
+			Ny = util::strtoint(all_number.back());
+			all_number.pop_back();
+			Nx = util::strtoint(all_number.back());
+			if (maze_filename.empty()) maze_filename = "maze_.maze";
+			isloaded = load_maze(maze, maze_filename);
 		}
 
-		ImGui::Checkbox("Run", &Bool["Run"]());
+		ImGui::Text("Maze Nx[%d] Ny[%d] Loaded [%s]", Nx, Ny,
+			isloaded ? "is loaded" : "not loaded");
+		ImGui::Text("Size maze[%d] Size grid[%d]", maze.size(), grid.size());
+		// drawing maze 
+		if (ImGui::Button("Draw")) {
+			if (!maze.empty()) {
+				draw_maze(grid, maze, gridPos, red, ulength, thickness, Nx, Ny);
+			}
+		}
+
 		ImGui::Checkbox("Showbox", &Bool["ShowBox"]());
 
 		ImGui::SliderFloat("Delay", &delay, 0.f, 0.1f);
-		ImGui::SliderInt("start nx ", &nx, 0, Nx - 1);
-		ImGui::SliderInt("start ny ", &ny, 0, Ny - 1);
 
 		ImGui::End();
-
-
 		// ALL IMGUI Menu here End
 
 
-		// set position of box red indicator
+
+
+		// set position of box red
 		if (in_bound(nx, ny)) {
 			box.setPosition(gridPos + fvec2(thickness, thickness) + fvec2(nx, ny) * ulength);
 		}
 
 		window.clear();
+
 		// draw grid
 		for (auto& b : grid) {
 			window.draw(b);
 		}
-		// draw box indicator
+		// draw box indice
 		if (Bool["ShowBox"]())
 			window.draw(box);
 
@@ -578,6 +451,10 @@ int main() {
 
 
 	ImGui::SFML::Shutdown();
+
+
+
+
 
 
 	return 0;
