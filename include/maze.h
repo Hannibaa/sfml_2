@@ -63,6 +63,12 @@
 			FILE FORMAT
 			"maze_" + datetimeserialnumber + ".maze" + Nx + "x" + Ny
 
+			TODO :
+			1. save maze as image is not working
+			2. make player inside maze
+			3. make function of position any object inside maze and set the contrain
+			physic for that object (size object should be not exced a cell size).
+			4. 
 */
 
 #pragma once
@@ -114,7 +120,12 @@ namespace maze {
 		}
 	}
 
-	class Maze {
+	void clear(Stat_t& stat) {
+		util::reset(stat, WALLS_UNVISITED);
+		stat[0] = WALLS_VISITED;
+	}
+
+	class Maze : public sf::Drawable {
 
 		int						_Nx;
 		int						_Ny;
@@ -129,6 +140,7 @@ namespace maze {
 		Grid_t					_grid;
 		Stat_t					_maze;
 		std::stack<iCoord>		_prev;
+		Box_t					b_Index;
 
 		int						nVisited;
 		int						nVisitedNeibor;
@@ -138,7 +150,9 @@ namespace maze {
 		int						oldny;
 
 		util::mapBool			iBool;  // internal bool usage
-		util::mapBool&			xBool;	// external bool import or export
+		bool					_b_box_show;
+		bool&					_b_run;
+		bool&					_b_skip;
 
 		std::function<void(int&, int&)>		_walk_func;       // function for walk function design
 		std::function<int(int, int)>		_visited_neibors; // function for visitation critiria
@@ -155,11 +169,15 @@ namespace maze {
 			// Set the boolean game 
 			iBool["validate"] = { false, "start run game" };
 			iBool["run"] = { true, "start run game" };
+			iBool["restart"] = { false, "restart game" };
+			_b_box_show = true;
 
 			make_grid(_grid, _pos, _wall_color, _color, _ulength, _wthickness, _Nx, _Ny);
 
 			reset_stat();
-
+			b_Index.setSize({ _ilength, _ilength });
+			b_Index.setFillColor(color_t::Red);
+			util::clear(_prev);
 			_prev.push({ 0,0 });
 			nVisited = 0;
 			nVisitedNeibor = 0;
@@ -167,19 +185,128 @@ namespace maze {
 			ny = 0;
 			oldnx = 0;
 			oldny = 0;
-			//Bool["Skip"]() = true;
-			//Bool["SetGame"]() = false;
+			iBool["validate"]() = true;
+		}
+
+		void draw(sf::RenderTarget& target, sf::RenderStates states = sf::RenderStates::Default) const override {
+			
+
+			for (auto& g : _grid) {
+				target.draw(g, states);
+			}
+
+			if (_b_box_show)
+			target.draw(b_Index, states);
+		}
+
+		bool has_maze_extension(const std::string& filename) {
+			return std::filesystem::path(filename).extension() == ".maze";
+		}
+
+		std::string make_maze_extension(std::string filename) {
+			std::filesystem::path  path(filename);
+
+			if (path.extension() != ".maze") path.replace_extension(".maze");
+
+			return path.string();
+		}
+
+		std::string finger_print_name(const std::string& filename) {
+			std::string text = "__" + std::to_string(_Nx) + "x" + std::to_string(_Ny);
+			std::filesystem::path path(filename);
+			path.replace_filename(path.stem().string() + text + path.extension().string());
+
+			return path.string();
 		}
 
 	public:
-		Maze(int Nx, int Ny, f32 length, f32 wall_thickness, util::mapBool& ext_Bool):
+		Maze(int Nx, int Ny, f32 length, f32 wall_thickness, bool& brun, bool& bskip):
 			_Nx(Nx),
 			_Ny(Ny),
 			_pos(10.f, 10.f),
 			_ulength(length),
 			_wthickness(wall_thickness),
-			xBool(ext_Bool)
+			_b_run(brun),
+			_b_skip(bskip)
 		{
+			init();
+		}
+
+		ivec2 getSize() const {
+			return ivec2(_Nx, _Ny);
+		}
+
+		bool save_as_image(sf::RenderWindow& window, const std::string& filename) {
+			return util::save_window_interior(window, sf::IntRect(0, 0, _Nx * _ulength, _Ny * _ulength), filename);
+		}
+
+		bool save_to_file(std::string filename) {
+
+			filename = make_maze_extension(filename);
+			filename = finger_print_name(filename);
+			
+			std::ofstream	file(filename, std::ios::binary);
+
+			if (!file) {
+				std::cerr << "Error: Cannot open file for writing : " << filename << '\n';
+				return false;
+			}
+
+			// 1. write Nx and Ny and check if it's size of vector.
+			file.write(reinterpret_cast<const char*>(&_Nx), sizeof(_Nx));
+			file.write(reinterpret_cast<const char*>(&_Ny), sizeof(_Ny));
+
+			// 2. write vector
+			file.write(reinterpret_cast<const char*>(_maze.data()), _Nx * _Ny * sizeof(int));
+
+			return true;
+		}
+
+		bool open_maze(const std::string& filename) {
+
+			if (!has_maze_extension(filename)) return false;
+
+			std::ifstream		file(filename, std::ios::binary);
+
+			if (!file) {
+				std::cerr << "Error : Cannot open file for reading : " << filename << '\n';
+				return false;
+			}
+
+			// 1. read size of maze _Nx, _Ny, 
+			file.read(reinterpret_cast<char*>(&_Nx), sizeof(_Nx));
+			file.read(reinterpret_cast<char*>(&_Ny), sizeof(_Ny));
+
+			// 2. read data to vector
+			_maze.clear();
+			_maze.resize(_Nx * _Ny);
+
+			file.read(reinterpret_cast<char*>(_maze.data()), _Nx * _Ny * sizeof(int));
+			draw_maze();
+
+			return true;
+
+		}
+
+		void set_boolean(const std::string& name_bool) {
+			if (iBool.contains(name_bool))
+			iBool[name_bool]() = true;
+		}
+
+		void restart()  {
+			if (iBool["restart"]()) {
+				init();
+				iBool["restart"]() = false;
+			}
+		}
+
+		void hide_show_box() {
+			_b_box_show = !_b_box_show;
+		}
+
+		void set_dimension(int Nx, int Ny) {
+			_Nx = Nx;
+			_Ny = Ny;
 			init();
 		}
 
@@ -193,8 +320,16 @@ namespace maze {
 			make_grid(_grid, _pos, _wall_color, _color, _ulength, _wthickness, _Nx, _Ny);
 		}
 
-		void reset_grid() {
+		void reset() {
 			clear(_grid);
+			clear(_maze);
+			util::clear(_prev);
+			_prev.push({ 0,0 });
+			nx = 0;
+			ny = 0;
+			oldnx = 0;
+			oldny = 0;
+			nVisited = 0;
 		}
 
 		void draw_maze() {
@@ -212,6 +347,10 @@ namespace maze {
 
 		bool in_bound(int x, int y) const {
 			return x >= 0 && x < _Nx && y >= 0 && y < _Ny;
+		}
+
+		bool in_bound(const ivec2 p) const {
+			return in_bound(p.x, p.y);
 		}
 
 		int NZ(int x, int y) const {
@@ -298,7 +437,7 @@ namespace maze {
 		}
 
 		void run() {
-			if (iBool["run"]()) {
+			if (_b_run) {
 				// random function
 				util::iRG<int>		irand;
 				// calculate visit neibors
@@ -314,12 +453,12 @@ namespace maze {
 					else {
 						_prev.push({ 0,0 });
 					}
-					iBool["validate"]() = true;
+					_b_skip = true;
 				}
 				else {
 					walk_function(nx, ny);
 
-					iBool["validate"]() = true;
+					_b_skip = true;
 
 					util::clamp(nx, 0, _Nx - 1);
 					util::clamp(ny, 0, _Ny - 1);
@@ -329,7 +468,7 @@ namespace maze {
 		}
 
 		void move() {
-			if (iBool["validate"]()) {
+			if (_b_skip) {
 				if (nVisited < _Nx * _Ny) {
 					// Create a matrix of visited cells
 					if ((stat(nx,ny) & 0b1) == 0) {
@@ -356,13 +495,50 @@ namespace maze {
 					}
 				}
 				else
-					iBool["run"]() = false;
+					_b_run = false;
 
-				iBool["validate"]() = false;
+				_b_skip = false;
 			}
+
+			b_Index.setPosition(_pos + fvec2(_wthickness, _wthickness) + fvec2(nx, ny) * _ulength);
 		}
 
+		// object type should be have function getPosition
+		template<typename OBJECT>
+		void setPosition(OBJECT& b, int x, int y) {
+			f32 offset = (_ulength - b.getSize().x) / 2.f;
+			b.setPosition(_pos + fvec2(offset, offset) + fvec2(x, y) * _ulength);
+		}
+
+		template<typename OBJECT>
+		ivec2 getPosition(OBJECT& b) {
+			f32 offset = (_ulength - b.getSize().x) / 2.f;
+			fvec2 p = b.getPosition();
+			return util::as<int>((1.f / f32(_ulength)) * (p - _pos - fvec2(offset, offset)));
+		}
+
+		template<typename OBJECT>
+		void setPosition(OBJECT& b, const ivec2& p) {
+			b.setPosition(b, p.x, p.y);
+		}
+
+		bool check(const ivec2& p, const ivec2& oldp) {
+			return in_bound(p) && in_bound(oldp);
+		}
+
+		int possible_direction(int dir, const ivec2& p) {
+			auto s = stat(p.x, p.y);
+			switch (dir) {
+			case 0: if (WALL1(s) == 0)  return -1;else return dir;
+			case 1: if (WALL2(s) == 0)  return -1; else return dir;
+			case 2: if (WALL3(s) == 0)  return -1; else return dir;
+			case 3: if (WALL4(s) == 0)  return -1; else return dir;
+			}
+
+			return -1;
+		}
 	};
 
 
 }
+

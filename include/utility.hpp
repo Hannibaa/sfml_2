@@ -512,6 +512,14 @@ namespace util {
 		}
 	};
 
+	float sign(float a)
+	{
+		return a < 0.0f ? -1.0f : 1.0f;
+	}
+
+	int sign(int a) {
+		return a < 0 ? -1 : 1;
+	}
 
 
 }// Namespace util

@@ -12,6 +12,9 @@
 using fvec2 = sf::Vector2f;
 using ivec2 = sf::Vector2i;
 using VSprites = std::vector<sf::Sprite>;
+using Box_t = sf::RectangleShape;
+using Circle_t = sf::CircleShape;
+using color_t = sf::Color;
 
 
 namespace util {
@@ -101,13 +104,25 @@ namespace util {
 		return (v.x * v.x + v.y * v.y);
 	}
 
-	float sign(float a)
+	bool save_window_interior(sf::RenderWindow& window, const sf::IntRect& rect,
+		const std::string& filename)
 	{
-		return a < 0.0f ? -1.0f : 1.0f;
-	}
+		// Capture the whole window
+		sf::Texture	tex;
+		tex.create(window.getSize().x, window.getSize().y);
+		tex.update(window);
 
-	int sign(int a) {
-		return a < 0 ? -1 : 1;
+		// Convert to image
+		sf::Image	fullimage = tex.copyToImage();
+
+		// Create the cropped image
+		sf::Image	cropped;
+		cropped.create(rect.width, rect.height);
+		
+		// Copy the selected rectangle
+		cropped.copy(fullimage, 0, 0, rect, false);
+
+		return cropped.saveToFile(filename);
 	}
 
 } // END OF UTIL NAMESPACE

@@ -45,14 +45,16 @@
 			: add save function to saving in maze file
 
 			SAVE IN FILE:
+			maze is saved inside vector of integer size Nx.Ny and each integer
+			represent cell stat in first 5 bits :
 					  0	  1    2
 						+----+
 					  7	|    | 3     This cell(x,y) int : first bit for visited
 						+----+		 four next bit for wall open or not
-					  6	  5	   4
+					  6	  5	   4	 0 : wall exist, 1 : wall not exist.
 
-					  first bit from right indicate visited or no(0 not, 1 visited)
-					  second bit from right indicate wall 1 (1 wall exist, 0 not)
+					  first bit from right indicate visited or no(0 wall exist, 1 visited)
+					  second bit from right indicate wall 1 (1 not exist, 0 not)
 					  third bit from right indicate wall 3
 					  fourth bit from right indicate wall 5
 					  fifth bit from right indicate wall 7
@@ -61,7 +63,12 @@
 					  WALL(cell(x,y)) = 0b1101
 
 			FILE FORMAT
-			"maze_" + datetimeserialnumber + ".maze" + Nx + "x" + Ny 
+			"maze_" + datetimeserialnumber + ".maze" + Nx + "x" + Ny
+
+			TODO :
+			1. add costumed walk methode
+			2. add costumed chosing neibers
+			3. performed name of files
 
 */
 
@@ -73,160 +80,12 @@
 #include <stack>
 #include <functional>
 #include <SFML/Graphics.hpp>
+#include "../include/opendialogfile.h"
 #include "../include/util-sfml.hpp"
 #include "../include/box_s.hpp"
-
-#define VISITOR(x)		(x & 0b1)
-#define WALL1(x)		((x >> 1) & 1b)
-#define WALL2(x)		((x >> 2) & 1b)
-#define WALL3(x)		((x >> 3) & 1b)
-#define WALL4(x)		((x >> 4) & 1b)
-#define WALL(x,n)		((x >> n) & 1b)
-#define SETVISITOR(x)   
-
-#define SETWALLS(x)     
-
-using Grid_t = std::vector<util::Box_s>;
-
-static void make_grid(
-	Grid_t& grid,
-	const fvec2& pos,
-	color_t wall_color,
-	f32	ulength,
-	f32 wall_thickness,
-	u32	nx,
-	u32 ny
-)
-{
-	for (u32 i = 0; i < nx; ++i)
-		for (u32 j = 0; j < ny; ++j)
-		{
-			grid.push_back(util::Box_s(pos + fvec2(f32(i), f32(j)) * ulength, ulength, wall_thickness));
-		}
-}
+#include "../include/maze.h"
 
 
-static void reset_grid_color(Grid_t& grid) {
-	for (auto& b : grid) {
-		b.setFillColor(sf::Color::Transparent);
-		b.set_wall(util::Box_s::WALL::CLEAR);
-	}
-}
-
-void walk_function_1(int nx, int ny) {
-	util::iRG<int>		irand;
-	int walk = irand(0, 3);
-
-	switch (walk) {
-	case 0:++nx; break;
-	case 1:--nx; break;
-	case 2:++ny; break;
-	case 3:--ny; break;
-	}
-}
-
-class walk_behavior {
-	int&  _dir;
-
-public:
-	walk_behavior(int& dir) : _dir(dir) {};
-
-	void operator()(int nx, int ny) {
-		switch (_dir) {
-		case 0:++nx; break;
-		case 1:--nx; break;
-		case 2:++ny; break;
-		case 3:--ny; break;
-		}
-	}
-};
-
-static void run(int nx, int ny, int Nx, int Ny,
-	int(*visited_neibor)(int,int), 
-	std::stack<iCoord>& prev,
-	std::function<void(int,int)> walk_function,
-	bool& b_validate,
-	bool& b_runing) 
-{
-	if (b_runing) {
-		// random function
-		util::iRG<int>		irand;
-		// calculate visit neibors
-		int visitedNeibor = visited_neibor(nx, ny);
-
-		// checking 
-		if (visitedNeibor == 4) {
-			prev.pop();
-			if (!prev.empty()) {
-				nx = prev.top().x;
-				ny = prev.top().y;
-			}
-			else {
-				prev.push({ 0,0 });
-			}
-			b_validate = true;
-		}
-		else {
-			int walk = irand(0, 3);
-
-			switch (walk) {
-			case 0:++nx; break;
-			case 1:--nx; break;
-			case 2:++ny; break;
-			case 3:--ny; break;
-			}
-
-			b_validate = true;
-
-			util::clamp(nx, 0, Nx - 1);
-			util::clamp(ny, 0, Ny - 1);
-		}
-	}
-}
-
-void move(Grid_t& grid, 
-		std::vector<int>& maze,
-		std::stack<iCoord>& prev,
-	void (*remove_adjacent_wall)(int,int , int, int),
-	int nx, int ny, int Nx, int Ny,
-	int& nVisited, 
-	bool& b_validate, 
-	bool& b_runing
-	) 
-{
-	if (b_validate) {
-		if (nVisited < Nx * Ny) {
-			// Create a matrix of visited cells
-			if ((maze[ny + Ny * nx] & 0b1) == 0) {
-				maze[ny + Ny * nx] |= 1;
-				// memorized top previous visited cell to checked after
-				int oldx = prev.top().x;
-				int oldy = prev.top().y;
-
-				// push new visited cell
-				prev.push({ nx,ny });
-				++nVisited;
-
-				//  remove wall between adjacent cells
-				remove_adjacent_wall(nx, ny, oldx, oldy);
-			}
-			else {
-				nx = prev.top().x;
-				ny = prev.top().y;
-			}
-
-			// paint visited cell
-			if ((maze[ny + Ny * nx] & 0b1) == 1) {
-				grid[ny + Ny * nx].setFillColor(color_t::Black);
-			}
-		}
-		else
-			b_runing = false;
-
-		b_validate = false;
-	}
-
-}
 
 int main() {
 
@@ -234,8 +93,10 @@ int main() {
 	const i32			WinWidth = 1200;
 	const i32			WinHeight = 800;
 
-	const i32			MAX_X{ 30 };
-	const i32			MAX_Y{ 25 };
+	const i32			Nx_Max{ 30 };
+	const i32			Ny_Max{ 25 };
+
+	const size_t		MAX_POISON{ 10 };
 
 	const f32			FontScale = 1.5f;
 
@@ -243,15 +104,10 @@ int main() {
 	color_t				red = color_t::Red;
 	color_t				blue = color_t::Blue;
 	color_t				black = color_t::Black;
-	int								Nx{ 15 }, Ny{ 20 };
-
-	std::cout << "Enter number of column(2 - "<< MAX_X << ") : ";
-	std::cin >> Nx;
-	std::cout << "Enter number of lines(2 - " << MAX_Y << ") : ";
-	std::cin >> Ny;
-
-	util::clamp(Nx, 2, MAX_X);
-	util::clamp(Ny, 2, MAX_Y);
+	int					Nx{ 10 }, Ny{ 10 };
+	f32					length{ 30.f };
+	f32					thickness{ 2.f };
+	f32					ilength = length - 2.f * thickness;
 
 	util::iRG<int>		irand;
 
@@ -259,136 +115,9 @@ int main() {
 	ImGui::SFML::Init(window);
 	ImGui::GetIO().FontGlobalScale = FontScale;
 
-	// Bool action
-	util::mapBool		Bool;
-	Bool["ShowOption"] = { true, "Show option menu" };
-	Bool["Run"] = { false, "Run the strategy" };
-	Bool["Skip"] = { true, "skip the loop" };
-	Bool["Back"] = { false,"Backspace or to get possible case" };
-	Bool["ShowBox"] = { true, "Show a box index" };
-
-	// box that make maze
-	Box_t							box;
-	// grid 
-	Grid_t							grid;
-	// maze stat cell
-	std::vector<int>				maze;
-	// stack of path visited cell
-	std::stack<iCoord>				prev;
-	int prevx{}, prevy{};
-
-	int								nVisited{ 1 };
-	color_t							color(sf::Color::White);
-	int								nx{}, ny{};
-	int								oldnx{}, oldny{};
-
-
-	float							ulength = 30.f;
-	float							thickness = 2.f;
-	float							ilength = ulength - thickness;
-	fvec2							gridPos(10.f, 10.f);
-
-	box.setSize(fvec2(ulength - thickness, ulength - thickness));
-	box.setFillColor(red);
-
-
-	make_grid(grid, gridPos, color, ulength, thickness, Nx, Ny);
-	const int WALLS_UNVISITED = 30;
-	const int WALLS_VISITED = 31;
-	maze.resize(Nx * Ny,WALLS_UNVISITED);
-	maze[0] = WALLS_VISITED;
-	prev.push({ 0,0 });
-
-	// check boundary of coordinate grid
-	auto in_bound = [=](int x, int y) {
-		return x >= 0 && x < Nx && y >= 0 && y < Ny;
-		};
-
-	// Coordinate grid to linear coordinate of maze
-	auto NZ = [=](int x, int y) {
-		if (in_bound(x, y)) return y + x * Ny;
-		};
-
-	// get safe maze stat
-	auto MAZE = [&](int x, int y) {
-		if (in_bound(x, y)) return maze[NZ(x, y)];
-		else return 1;
-		};
-
-	// this return 4 all close, < 4 there one open path
-	auto visited_neibor = [&](int x, int y) {
-		return (MAZE(x - 1, y) & 0b1) + (MAZE(x + 1, y) & 0b1) +
-			(MAZE(x, y - 1) & 0b1) + (MAZE(x, y + 1) & 0b1);
-		};
-
-	int visitedNeibor{};
-
-	// get wall number of two adjacent cell -1 for no matching
-	auto wall_adjacent = [](int x, int y, int oldx, int oldy) {
-		// there are four possible case 
-		if (x == oldx && y == oldy + 1) {
-			return 1;
-		}
-		if (x == oldx && y == oldy - 1) {
-			return 5;
-		}
-		if (x == oldx + 1 && y == oldy) {
-			return 7;
-		}
-		if (x == oldx - 1 && y == oldy) {
-			return 3;
-		}
-
-		return -1;
-		};
-
-	// remove wall of two cell adjacent
-	auto remove_adjacent_wall = [&](int x, int y, int oldx, int oldy) {
-		int wall = wall_adjacent(x, y, oldx, oldy);
-		switch (wall) {
-		case -1: return;
-		case 1: // other = 5
-			grid[NZ(x, y)].unset_wall(1);
-			grid[NZ(oldx, oldy)].unset_wall(5);
-			maze[NZ(x, y)] |= 0b10;
-			maze[NZ(oldx, oldy)] |= 0b1000;
-			break;
-		case 5:
-			grid[NZ(x, y)].unset_wall(5);
-			grid[NZ(oldx, oldy)].unset_wall(1);
-			maze[NZ(x, y)] |= 0b1000;
-			maze[NZ(oldx, oldy)] |= 0b10;
-			break;
-		case 7:
-			grid[NZ(x, y)].unset_wall(7);
-			grid[NZ(oldx, oldy)].unset_wall(3);
-			maze[NZ(x, y)] |= 0b10000;
-			maze[NZ(oldx, oldy)] |= 0b100;
-			break;
-		case 3:
-			grid[NZ(x, y)].unset_wall(3);
-			grid[NZ(oldx, oldy)].unset_wall(7);
-			maze[NZ(x, y)] |= 0b100;
-			maze[NZ(oldx, oldy)] |= 0b10000;
-			break;
-		}
-		};
-
-	// Reset all maze program
-	auto reset_maze = [&]() {
-		util::reset(maze, WALLS_UNVISITED);
-		maze[0] = WALLS_VISITED;
-		reset_grid_color(grid);
-		util::clear(prev);
-		prev.push({ 0,0 });
-		nVisited = 0;
-		nx = 0;
-		ny = 0;
-		oldnx = 0;
-		oldny = 0;
-		Bool["Skip"]() = true;
-		};
-
+	ImVec2				winPos(Nx_Max * length + 10, 0);
+	ImVec2				winSize(WinWidth - winPos.x, WinHeight);
+	
 	fvec2				fmouse{};
 	ivec2				imouse{};
 	sf::Clock			iclock;
@@ -405,8 +134,68 @@ int main() {
 	float				elapsed_time = 1.f;
 
 
+	util::mapBool		Bool;
+	Bool["Restart"] = { false, "restart a game" };
+	Bool["Save"] = { false, "Open save dialogue box" };
+	Bool["Open"] = { false, "Open new maze" };
+	Bool["Resize"] = { false, "Resize the grid" };
+
+	Bool["run"] = { false, "run maze making" };
+	Bool["skip"] = { false, "accept only when ok" };
+	Bool["play"] = { false, "start playing game" };
+
+	maze::Maze			Maze(Nx, Ny, length, thickness, Bool["run"]._action,
+														Bool["skip"]._action);
+
+	std::string			maze_name("maze");
+	 
+	Box_t				player({ilength, ilength});
+	player.setFillColor(color_t::Green);
+	Maze.setPosition(player, 1, 1);
+
+	std::vector<Box_t>		poison;
+	std::vector<Box_t>	resource;
+	int						life_time{ 100 };
+
+	auto Create_Poison = [&](size_t amount) {
+		if (amount > MAX_POISON) amount = MAX_POISON;
+		poison.resize(amount);
+		auto N = Maze.getSize();
+		for (auto& p : poison) {
+			p.setFillColor(color_t::Red);
+			p.setSize({ length - 20.f, length - 20.f });
+			int px = irand(1, N.x);
+			int py = irand(1, N.y);
+			Maze.setPosition(p, px, py);
+		}
+		};
+
+	auto Create_Resource = [&](size_t amount) {
+		if (amount > MAX_POISON) amount = MAX_POISON;
+		resource.resize(amount);
+		auto N = Maze.getSize();
+		for (auto& p : resource) {
+			p.setFillColor(color_t::Green);
+			p.setSize({ length - 20.f, length - 15.f });
+			int px = irand(1, N.x);
+			int py = irand(1, N.y);
+			Maze.setPosition(p, px, py);
+		}
+		};
+	
+	ivec2				p;
+	ivec2				oldp;
+	int					dir{ -1 };
+
 	// MAIN LOOP ///////////////////////////////////////////////////
 	while (window.isOpen()) {
+		/// STAR GAME PARAMETER ///
+		if (Bool["Restart"]()) {
+			Maze.set_dimension(Nx, Ny);
+			Bool["Restart"]() = false;
+		}
+
+
 		util::get_maximum(max_fps, fps);
 		util::get_minimum(min_fps, fps);
 		fps = 1.f / elapsed_time;
@@ -417,8 +206,6 @@ int main() {
 
 		// Make manual delay in loop
 		util::waiting<sf::Clock>(delay);
-		oldnx = nx;
-		oldny = ny;
 
 		sf::Event	event;
 		while (window.pollEvent(event)) {
@@ -429,12 +216,10 @@ int main() {
 			fmouse = util::as<float>(imouse);
 
 			if (event.type == sf::Event::KeyPressed) {
-
-				if (event.key.code == sf::Keyboard::A && event.key.control) {
-					Bool["ShowOption"].not_();
-				}
-
-				
+				if (event.key.code == sf::Keyboard::Up) dir = 0;
+				if (event.key.code == sf::Keyboard::Right) dir = 1;
+				if (event.key.code == sf::Keyboard::Down) dir = 2;
+				if (event.key.code == sf::Keyboard::Left) dir = 3;
 			}
 
 			if (event.type = sf::Event::MouseButtonPressed)
@@ -449,128 +234,178 @@ int main() {
 		ImGui::SFML::Update(window, iclock.restart());
 
 
-		// Random runnig of maze
-		if (Bool["Run"]()) {
-			// calculate visit neibors
-			visitedNeibor = visited_neibor(nx, ny);
+		ImGui::SetNextWindowSize(winSize);
+		ImGui::SetNextWindowPos(winPos);
 
-			// checking 
-			if (visitedNeibor == 4) {
-				prev.pop();
-				if (!prev.empty()) {
-					nx = prev.top().x;
-					ny = prev.top().y;
-				}
-				else {
-					prev.push({ 0,0 });
-				}
-				Bool["Skip"]() = true;
-			}
-			else {
-				int walk = irand(0, 3);
+		ImGui::Begin("Maze Option");
 
-				switch (walk) {
-				case 0:++nx; break;
-				case 1:--nx; break;
-				case 2:++ny; break;
-				case 3:--ny; break;
-				}
-
-				Bool["Skip"]() = true;
-
-				util::clamp(nx, 0, Nx - 1);
-				util::clamp(ny, 0, Ny - 1);
-			}
-		}
-
-		// Check if box is visited only when you performed a movement 
-		// Memorization, Verification and Creation of Path
-		if (Bool["Skip"]()) {
-			if (nVisited < Nx * Ny) {
-				// Create a matrix of visited cells
-				if ((maze[ny + Ny * nx] & 0b1) == 0) {
-					maze[ny + Ny * nx] |= 1;
-					// memorized top previous visited cell to checked after
-					int oldx = prev.top().x;
-					int oldy = prev.top().y;
-
-					// push new visited cell
-					prev.push({ nx,ny });
-					++nVisited;
-
-					//  remove wall between adjacent cells
-					remove_adjacent_wall(nx, ny, oldx, oldy);
-				}
-				else {
-					nx = prev.top().x;
-					ny = prev.top().y;
-				}
-
-				// paint visited cell
-				if ((maze[ny + Ny * nx] & 0b1) == 1) {
-					grid[ny + Ny * nx].setFillColor(black);
-				}
-			}
-			else
-				Bool["Run"]() = false;
-
-			Bool["Skip"]() = false;
-		}
-
-
-
-		// ALL IMGUI Menu here Begin
-		if (!prev.empty()) {
-			prevx = prev.top().x;
-			prevy = prev.top().y;
-		}
-
-		ImGui::Begin("Option", &Bool["ShowOption"]());
 		if (ImGui::Button("Close")) window.close();
-		ImGui::Text("FPS[ %.2f ] ELAPSED[%2.4f]", fps, elapsed_time);
-		ImGui::Text("FPS[ %.2f ] ", fps5sec);
-		//ImGui::Text("Grid Number[%d][%d]", gnum.x, gnum.y);
-		ImGui::Text("Max[%.2f]   Min[%.2f]", max_fps, min_fps);
-		ImGui::Text("Visited %d", nVisited);
-		ImGui::Text("[%d][%d] stat[%d]", nx, ny, maze[ny + Ny * nx]);
-		ImGui::Text("[%d]stack[%d][%d] stat[%d]", prev.size(), prevx, prevy, maze[prevy + Ny * prevx]);
-		ImGui::Text("Visited Neibors [%d]", visitedNeibor);
-		if (ImGui::Button("RESETMAZE")) {
-			reset_maze();
+
+		if (ImGui::Button("Reset")) {
+			Maze.restart();
+		}
+
+		if (ImGui::Button("Resize")) {
+			Bool["Resize"]() = true;
+		}
+
+		if (ImGui::Button("Open")) {
+			Bool["Open"]() = true;
 		}
 
 		if (ImGui::Button("Save")) {
-			std::string filename = "maze_" + util::make_serial_daytime()
-				+ ".maze" + std::to_string(Nx) + "x" + std::to_string(Ny);
-			util::save_vector_to(maze, filename);
+			Bool["Save"]() = true;
 		}
 
-		ImGui::Checkbox("Run", &Bool["Run"]());
-		ImGui::Checkbox("Showbox", &Bool["ShowBox"]());
+		if (ImGui::Button("Export Image")) {
+			Maze.save_as_image(window,maze_name);
+		}
+
+		if (ImGui::Button("Redo")) {
+			Maze.reset();
+			Bool["run"]() = true;
+		}
+
+		if (ImGui::Button("Show")) Maze.hide_show_box();
 
 		ImGui::SliderFloat("Delay", &delay, 0.f, 0.1f);
-		ImGui::SliderInt("start nx ", &nx, 0, Nx - 1);
-		ImGui::SliderInt("start ny ", &ny, 0, Ny - 1);
 
+		ImGui::Checkbox("Run", &Bool["run"]());
+
+		if (ImGui::Checkbox("Play", &Bool["play"]())) {
+			delay = 0.07f;
+			Bool["run"]() = false;
+			Maze.hide_show_box();
+		}
+		ImGui::Separator();
+		if (ImGui::Button("Create Poison")) {
+			Create_Poison(4);
+		}
+		if (ImGui::Button("Create Resource")) {
+			Create_Resource(8);
+		}
+		ImGui::Separator();
+		ImGui::Text("Life Time [%d]", life_time);
+		
 		ImGui::End();
 
+		// Window for new Nx, Ny:--------------------------------------
+		if (Bool["Resize"]()) {
+			Bool["run"]() = false;
+			Bool["skip"]() = false;
+			ImGui::Begin("Chose Nx, Ny", (bool*)0, ImGuiWindowFlags_NoCollapse);
+			ImGui::SliderInt("Nx :", &Nx, 2, Nx_Max);
+			ImGui::SliderInt("Ny :", &Ny, 2, Ny_Max);
+			if (ImGui::Button("Accept")) {
+				Bool["Restart"]() = true;
+				Bool["Resize"]() = false;
+			}
+			ImGui::End();
+		}
 
-		// ALL IMGUI Menu here End
+		// Windows Save -------------------------------------------------
+		if (Bool["Save"]()) {
+			ImGui::Begin("Save File");
+			char buf[256] = "";
+			std::string _name = maze_name;
 
+			ImGui::InputText("Enter File Name", buf, sizeof(buf));
 
-		// set position of box red indicator
-		if (in_bound(nx, ny)) {
-			box.setPosition(gridPos + fvec2(thickness, thickness) + fvec2(nx, ny) * ulength);
+			if (ImGui::Button("Save")) {
+				if (std::strlen(buf) > 0) {
+					_name = std::string(buf);
+				}
+
+				_name +=  "_" + util::make_serial_daytime();
+
+				Maze.save_to_file(_name);
+				
+				Bool["Save"]() = false;
+			}
+
+			if (ImGui::Button("Quit")) {
+				Bool["Save"]() = false;
+			}
+
+			ImGui::End();
+			
+		}
+
+		// Window Open ------------------------------------------------------
+		if (Bool["Open"]()) {
+			std::string filename;
+			Bool["run"]() = false;
+			Bool["skip"]() = false;
+
+			// open file dialogue box
+			auto file = opendialog::OpenFile(L"Maze file .maze");
+			if (!file.empty()) {
+				filename = std::string(file.begin(), file.end());
+				Maze.open_maze(filename);
+			}
+
+			Bool["Open"]() = false;
+		}
+
+		// drawig the maze algorithm -------------------------------
+		if (!Bool["play"]()) {
+			Maze.run();
+			Maze.move();
+		}
+
+		// playing the game  ----------------------------------------
+		//
+		//		Using parameter for direction : dir
+		//		
+		// 
+		// ----------------------------------------------------------
+
+		if (Bool["play"]()) {
+			oldp = p;
+
+			dir = Maze.possible_direction(dir, p);
+
+			switch (dir) {
+			case 0: --p.y;break;
+			case 1: ++p.x;break;
+			case 2: ++p.y;break;
+			case 3: --p.x;break;
+			}
+
+			//dir = -1;
+
+			Maze.setPosition(player, p.x, p.y);
+
+			// eat resource
+			for (auto it = resource.begin(); it != resource.end();) {
+				auto prs = Maze.getPosition(*it);
+				if (prs.x == p.x && prs.y == p.y) {
+					++life_time;
+					it = resource.erase(it);
+				}
+				else ++it;
+			}
+
+			// died if eat poison
+			for (auto it = poison.begin(); it != poison.end(); ) {
+				auto pp = Maze.getPosition(*it);
+				if (pp.x == p.x && pp.y == p.y) {
+					--life_time;
+					it = poison.erase(it);
+				}
+				else ++it;
+			}
 		}
 
 		window.clear();
+
 		// draw grid
-		for (auto& b : grid) {
-			window.draw(b);
+		window.draw(Maze);
+		if (Bool["play"]()) {
+			window.draw(player);
+			for (auto p : poison) window.draw(p);
+			for (auto r : resource) window.draw(r);
 		}
-		// draw box indicator
-		if (Bool["ShowBox"]())
-			window.draw(box);
 
 		ImGui::SFML::Render(window);
 		window.display();
